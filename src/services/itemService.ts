@@ -13,19 +13,23 @@ export const createSecretItem = async (
     masterKey: string
 ): Promise<VaultItem> => {
 
-    // 1. Chuyển Object dữ liệu thành chuỗi JSON và MÃ HÓA nó
+    // 1. LẤY THÔNG TIN USER ĐANG ĐĂNG NHẬP (Dòng code mới thêm)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        throw new Error('Bạn chưa đăng nhập!');
+    }
+
     const jsonString = JSON.stringify(secretPayload);
     const encryptedContent = encryptData(jsonString, masterKey);
 
-    // 2. Chuẩn bị gói dữ liệu để gửi lên Supabase
     const newItem = {
+        user_id: user.id, // 2. GẮN ID CỦA USER VÀO ĐÂY ĐỂ SUPABASE CHẤP NHẬN
         type: 'SECRET',
         title: title,
         is_encrypted: true,
-        content: encryptedContent, // Đã bị mã hóa, Supabase không thể đọc được
+        content: encryptedContent,
     };
 
-    // 3. Gọi API của Supabase để lưu vào bảng 'items'
     const { data, error } = await supabase
         .from('items')
         .insert([newItem])
@@ -33,8 +37,23 @@ export const createSecretItem = async (
         .single();
 
     if (error) {
+        // In lỗi chi tiết ra màn hình console để dễ debug nếu có lỗi khác
+        console.error('Lỗi chi tiết từ Supabase:', error);
         throw new Error(`Lỗi khi lưu DB: ${error.message}`);
     }
 
     return data;
+};
+export const getItems = async (): Promise<VaultItem[]> => {
+    const { data, error } = await supabase
+        .from('items')
+        .select('*')
+        .order('created_at', { ascending: false }); // Sắp xếp mới nhất lên đầu
+
+    if (error) {
+        console.error('Lỗi khi lấy dữ liệu:', error);
+        throw new Error(error.message);
+    }
+
+    return data || [];
 };
