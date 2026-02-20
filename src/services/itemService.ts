@@ -57,3 +57,41 @@ export const getItems = async (): Promise<VaultItem[]> => {
 
     return data || [];
 };
+
+export const deleteItem = async (id: string): Promise<void> => {
+    const { error } = await supabase
+        .from('items')
+        .delete()
+        .eq('id', id); // Tìm đúng dòng có id này để xóa
+
+    if (error) {
+        console.error('Lỗi khi xóa:', error);
+        throw new Error('Không thể xóa dữ liệu này!');
+    }
+};
+export const updateSecretItem = async (
+    id: string,
+    title: string,
+    secretPayload: object,
+    masterKey: string
+): Promise<void> => {
+
+    // 1. Mã hóa lại dữ liệu mới
+    const jsonString = JSON.stringify(secretPayload);
+    const encryptedContent = encryptData(jsonString, masterKey);
+
+    // 2. Gọi Supabase để update
+    const { error } = await supabase
+        .from('items')
+        .update({
+            title: title,
+            content: encryptedContent,
+            updated_at: new Date().toISOString() // Cập nhật luôn thời gian sửa
+        })
+        .eq('id', id);
+
+    if (error) {
+        console.error('Lỗi khi cập nhật:', error);
+        throw new Error('Không thể cập nhật dữ liệu!');
+    }
+};
