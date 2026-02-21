@@ -9,7 +9,7 @@ export interface VaultItem {
     type: ItemType;
     title: string;
     is_encrypted: boolean;
-    content: any; // Sẽ là chuỗi string (nếu bị mã hóa) hoặc object (nếu là plain text)
+    content: string; // Chuỗi string đã mã hóa (encrypted)
     tags?: string[];
     created_at?: string;
 }

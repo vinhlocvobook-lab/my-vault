@@ -4,10 +4,7 @@
 			"path": "../../hello-supabase"
 		},
 		{
-			"name": "SSH FS - gcall.com.vn",
-			"uri": "ssh://gcall.com.vn/"
-		},
-		{
+			"name": "my-vault-app",
 			"path": ".."
 		}
 	],

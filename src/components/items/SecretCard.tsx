@@ -1,189 +1,168 @@
 // Đường dẫn: src/components/items/SecretCard.tsx
 import React, { useState } from 'react';
-import { toast } from 'react-hot-toast'; // Thêm import này
-import { useVaultStore } from '../../store/vaultStore';
+import { Copy, Trash2, Edit, Eye, EyeOff, FileText, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import type { VaultItem } from '../../types'; // SỬA: Đã thêm 'type'
 import { decryptData } from '../../lib/crypto';
-import type { VaultItem } from '../../types';
-import { deleteItem } from '../../services/itemService'; // 1. Import hàm xóa
-import { EditSecretModal } from './EditSecretModal'; // Thêm dòng này
-import { Eye, EyeOff, Copy, Server, Trash2, Edit } from 'lucide-react';
+import { useVaultStore } from '../../store/vaultStore';
+import { deleteItem } from '../../services/itemService'; // SỬA: Trỏ về đúng thư mục services
+import { toast } from 'react-hot-toast';
 
 interface SecretCardProps {
     item: VaultItem;
     onRefresh: () => void;
+    onEdit: (item: VaultItem) => void; // Đã thêm onEdit vào đây
 }
 
-export const SecretCard: React.FC<SecretCardProps> = ({ item, onRefresh }) => {
-    // 1. Lấy Master Key từ bộ nhớ đệm (RAM)
-    const masterKey = useVaultStore((state) => state.masterKey);
-
-    // 2. State quản lý UI
+export const SecretCard: React.FC<SecretCardProps> = ({ item, onRefresh, onEdit }) => {
+    const { masterKey } = useVaultStore();
     const [showPassword, setShowPassword] = useState(false);
-    // const [copySuccess, setCopySuccess] = useState('');
-    const [isDeleting, setIsDeleting] = useState(false); // State để tạo hiệu ứng loading khi xóa
-    const [isEditOpen, setIsEditOpen] = useState(false); // Thêm dòng này
-    // 3. Logic Giải mã dữ liệu
-    let secretData: any = null;
-    if (item.is_encrypted && masterKey) {
-        const decryptedString = decryptData(item.content, masterKey);
-        if (decryptedString) {
-            try {
-                secretData = JSON.parse(decryptedString); // Chuyển chuỗi JSON thành Object
-            } catch (e) {
-                console.error('Lỗi parse JSON cấu trúc Secret');
-            }
-        }
-    }
-    // Hàm xử lý Xóa
-    // const handleDelete = async () => {
-    //     if (!window.confirm(`Bạn có chắc muốn xóa vĩnh viễn "${item.title}" không?`)) return;
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    //     setIsDeleting(true);
-    //     try {
-    //         await deleteItem(item.id!);
-    //         onRefresh(); // Xóa xong thì gọi hàm load lại danh sách ở App.tsx
-    //     } catch (error) {
-    //         alert('Lỗi khi xóa!');
-    //         setIsDeleting(false);
-    //     }
-    // };
-    // Hàm xử lý Xóa
+    if (!masterKey) return null;
+
+    const decryptedData = decryptData(item.content, masterKey);
+
+    if (!decryptedData) {
+        return (
+            <div className="bg-red-50 p-5 rounded-xl border border-red-200 shadow-sm">
+                <h3 className="font-semibold text-red-700">{item.title}</h3>
+                <p className="text-sm text-red-500 mt-1">Lỗi giải mã! Có thể sai Master Password hoặc dữ liệu bị hỏng.</p>
+            </div>
+        );
+    }
+
+    const decryptedType = decryptedData.type || 'PASSWORD';
+
     const handleDelete = async () => {
         if (!window.confirm(`Bạn có chắc muốn xóa vĩnh viễn "${item.title}" không?`)) return;
 
         setIsDeleting(true);
         try {
             await deleteItem(item.id!);
-            toast.success('Đã xóa thẻ này!');
+            toast.success('Đã xóa dữ liệu thành công!');
             onRefresh();
-        } catch (error: any) { // Thêm chữ : any vào đây
-            // Báo lỗi chi tiết thay vì báo chung chung
-            toast.error(`Lỗi chi tiết: ${error.message}`);
+        } catch (error: unknown) {
+            toast.error(`Lỗi: ${error instanceof Error ? error.message : 'Không xóa được'}`);
             setIsDeleting(false);
         }
     };
-    // Hàm xử lý copy nhanh
-    // const handleCopy = (text: string, type: string) => {
-    //     navigator.clipboard.writeText(text);
-    //     setCopySuccess(type);
-    //     setTimeout(() => setCopySuccess(''), 2000); // Ẩn thông báo sau 2s
-    // };
+
     const handleCopy = (text: string, type: string) => {
+        if (!text) return;
         navigator.clipboard.writeText(text);
-        // Thay toàn bộ logic cũ bằng 1 dòng toast siêu đẹp
-        toast.success(`Đã copy ${type === 'user' ? 'Username' : 'Password'}`);
+
+        let msg = 'Đã copy thành công!';
+        if (type === 'user') msg = 'Đã copy Username!';
+        if (type === 'pass') msg = 'Đã copy Password!';
+        if (type === 'note') msg = 'Đã copy Ghi chú!';
+        if (type === 'url') msg = 'Đã copy Đường dẫn!';
+
+        toast.success(msg);
     };
-    // Nếu giải mã thất bại (Sai pass hoặc chưa nhập pass)
-    if (!secretData) {
-        return (
-            <div className="p-4 border border-red-500 bg-red-50 rounded-lg text-red-600 relative flex justify-between items-center">
-                <span>🔒 Không thể giải mã dữ liệu.</span>
-                <button onClick={handleDelete} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-100 rounded">
-                    <Trash2 size={18} />
-                </button>
-            </div>
-        );
-    }
 
-    // 4. Render Giao diện khi giải mã thành công
     return (
-        <>
-            <div className={`p-5 border border-slate-200 rounded-xl shadow-sm bg-white hover:shadow-md transition-all relative ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}>
-                {/* Nút Xóa */}
-                {/* <button
-                onClick={handleDelete}
-                className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                title="Xóa thẻ này"
-            >
-                <Trash2 size={18} />
-            </button> */}
-
-                {/* Nhóm Nút Xóa và Sửa góc phải */}
-                <div className="absolute top-4 right-4 flex gap-1">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all relative group">
+            <div className="flex justify-between items-start mb-4">
+                <h3 className="font-semibold text-lg text-slate-800">{item.title}</h3>
+                <div className="flex gap-2">
                     <button
-                        onClick={() => setIsEditOpen(true)} // Mở modal sửa
-                        className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Chỉnh sửa thẻ này"
+                        onClick={() => onEdit(item)}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Chỉnh sửa"
                     >
                         <Edit size={18} />
                     </button>
                     <button
                         onClick={handleDelete}
-                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Xóa thẻ này"
+                        disabled={isDeleting}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Xóa"
                     >
                         <Trash2 size={18} />
                     </button>
                 </div>
-                {/* Tiêu đề & Icon */}
-                <div className="flex items-center gap-3 mb-4 border-b pb-3">
-                    <Server className="text-blue-600" size={24} />
-                    <h3 className="text-lg font-bold text-gray-800">{item.title}</h3>
-                </div>
+            </div>
 
-                {/* Thông tin chi tiết */}
-                <div className="space-y-3">
-                    {/* Username */}
-                    {secretData.username && (
-                        <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                            <span className="text-sm font-medium text-gray-500 w-24">User:</span>
-                            <span className="font-mono text-gray-800 flex-1">{secretData.username}</span>
-                            <button
-                                onClick={() => handleCopy(secretData.username, 'user')}
-                                className="p-1.5 text-gray-400 hover:text-blue-600 rounded"
-                                title="Copy Username"
-                            >
+            <div className="space-y-3">
+                {decryptedType === 'PASSWORD' && (
+                    <>
+                        <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                            <div className="flex flex-col overflow-hidden">
+                                <span className="text-xs text-slate-500 font-medium mb-0.5">Tài khoản</span>
+                                <span className="text-slate-700 text-sm truncate">{decryptedData.username || '(trống)'}</span>
+                            </div>
+                            <button onClick={() => handleCopy(decryptedData.username, 'user')} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors ml-2 flex-shrink-0">
                                 <Copy size={16} />
                             </button>
                         </div>
-                    )}
 
-                    {/* Password */}
-                    {secretData.password && (
-                        <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                            <span className="text-sm font-medium text-gray-500 w-24">Pass:</span>
-                            <span className="font-mono text-gray-800 flex-1">
-                                {showPassword ? secretData.password : '••••••••••••'}
-                            </span>
-
-                            <div className="flex gap-1">
-                                <button
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="p-1.5 text-gray-400 hover:text-blue-600 rounded"
-                                    title={showPassword ? "Ẩn" : "Hiện"}
-                                >
+                        <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                            <div className="flex flex-col w-full overflow-hidden">
+                                <span className="text-xs text-slate-500 font-medium mb-0.5">Mật khẩu</span>
+                                <span className="text-slate-700 font-mono tracking-wider text-sm truncate pr-2">
+                                    {showPassword ? decryptedData.password : '••••••••••••'}
+                                </span>
+                            </div>
+                            <div className="flex gap-1 flex-shrink-0">
+                                <button onClick={() => setShowPassword(!showPassword)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
                                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
-                                <button
-                                    onClick={() => handleCopy(secretData.password, 'pass')}
-                                    className="p-1.5 text-gray-400 hover:text-blue-600 rounded"
-                                    title="Copy Password"
-                                >
+                                <button onClick={() => handleCopy(decryptedData.password, 'pass')} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
                                     <Copy size={16} />
                                 </button>
                             </div>
                         </div>
-                    )}
+                    </>
+                )}
 
-                    {/* Thông báo Copy */}
-                    {/* {copySuccess && (
-                        <div className="text-xs text-green-600 text-right animate-pulse">
-                            Đã copy {copySuccess === 'user' ? 'Username' : 'Password'}!
+                {decryptedType === 'NOTE' && (
+                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 relative group/note">
+                        <div className="flex items-center gap-2 text-amber-800 font-medium mb-1.5 text-sm">
+                            <FileText size={16} />
+                            <span>Ghi chú bí mật</span>
                         </div>
-                    )} */}
-                </div>
+                        <p className="text-slate-700 whitespace-pre-wrap font-mono text-sm leading-relaxed max-h-32 overflow-y-auto pr-8">
+                            {decryptedData.note || '(trống)'}
+                        </p>
+                        <button
+                            onClick={() => handleCopy(decryptedData.note, 'note')}
+                            className="absolute top-2 right-2 p-1.5 bg-white text-slate-400 hover:text-amber-600 rounded opacity-0 group-hover/note:opacity-100 transition-opacity shadow-sm border border-amber-100"
+                            title="Copy Ghi chú"
+                        >
+                            <Copy size={16} />
+                        </button>
+                    </div>
+                )}
 
+                {decryptedType === 'LINK' && (
+                    <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <div className="flex items-center gap-2 overflow-hidden mr-2">
+                            <LinkIcon size={18} className="text-blue-500 flex-shrink-0" />
+                            <span className="text-blue-700 truncate text-sm font-medium">
+                                {decryptedData.url || '(trống)'}
+                            </span>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                            <button
+                                onClick={() => handleCopy(decryptedData.url, 'url')}
+                                className="p-1.5 text-blue-400 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
+                                title="Copy Link"
+                            >
+                                <Copy size={16} />
+                            </button>
+                            <a
+                                href={decryptedData.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 text-blue-400 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
+                                title="Mở Link trong tab mới"
+                            >
+                                <ExternalLink size={16} />
+                            </a>
+                        </div>
+                    </div>
+                )}
             </div>
-            {/* Nhúng Modal Chỉnh sửa vào đây (Chỉ render khi secretData giải mã thành công) */}
-            {secretData && (
-                <EditSecretModal
-                    isOpen={isEditOpen}
-                    onClose={() => setIsEditOpen(false)}
-                    onSuccess={onRefresh} // Cập nhật xong thì tải lại dữ liệu ngoài App.tsx
-                    item={item}           // Truyền dữ liệu cũ vào
-                    secretData={secretData} // Truyền pass cũ vào
-                />
-            )}
-        </>
+        </div>
     );
 };

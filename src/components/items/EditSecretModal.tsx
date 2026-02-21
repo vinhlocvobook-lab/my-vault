@@ -1,51 +1,54 @@
 // Đường dẫn: src/components/items/EditSecretModal.tsx
 import React, { useState, useEffect } from 'react';
-import { X, Save, Dices, Eye, EyeOff } from 'lucide-react';
-import { toast } from 'react-hot-toast'; // Thêm import này
-import { updateSecretItem } from '../../services/itemService';
+import { X, Save, Dices, Eye, EyeOff, KeyRound, FileText, Link as LinkIcon } from 'lucide-react';
 import { useVaultStore } from '../../store/vaultStore';
-import type { VaultItem } from '../../types';
+import { updateSecretItem } from '../../services/itemService';
+import { decryptData } from '../../lib/crypto';
+import { toast } from 'react-hot-toast';
+import type { VaultItem } from '../../types'; // SỬA: Đã thêm 'type'
 
 interface EditSecretModalProps {
+    item: VaultItem | null;
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
-    item: VaultItem;      // Nhận thông tin thẻ hiện tại (để lấy ID và Title)
-    secretData: any;      // Nhận dữ liệu đã giải mã (để lấy Username, Password hiện tại)
 }
 
-export const EditSecretModal: React.FC<EditSecretModalProps> = ({ isOpen, onClose, onSuccess, item, secretData }) => {
-    const masterKey = useVaultStore((state) => state.masterKey);
-    const [loading, setLoading] = useState(false);
+export const EditSecretModal: React.FC<EditSecretModalProps> = ({ item, isOpen, onClose, onSuccess }) => {
+    const [title, setTitle] = useState('');
+    const [itemType, setItemType] = useState<'PASSWORD' | 'NOTE' | 'LINK'>('PASSWORD');
 
-    // Khởi tạo state với dữ liệu cũ có sẵn
-    const [title, setTitle] = useState(item.title);
-    const [username, setUsername] = useState(secretData?.username || '');
-    const [password, setPassword] = useState(secretData?.password || '');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
-    // Nếu Modal đóng, không render gì cả
-    if (!isOpen) return null;
+    const [note, setNote] = useState('');
+    const [url, setUrl] = useState('');
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!title || !masterKey || !item.id) return;
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const { masterKey } = useVaultStore();
 
-        setLoading(true);
-        try {
-            const newPayload = { username, password };
-            await updateSecretItem(item.id, title, newPayload, masterKey);
+    useEffect(() => {
+        if (item && isOpen && masterKey) {
+            setTitle(item.title);
+            const decryptedData = decryptData(item.content, masterKey);
 
-            onSuccess(); // Gọi hàm loadData để tải lại danh sách
-            onClose();   // Đóng modal
-            toast.success('Cập nhật thành công!');
-        } catch (error) {
-            toast.error('Có lỗi xảy ra khi cập nhật!');
-        } finally {
-            setLoading(false);
+            if (decryptedData) {
+                const type = (decryptedData.type || 'PASSWORD') as 'PASSWORD' | 'NOTE' | 'LINK';
+                setItemType(type);
+
+                if (type === 'PASSWORD') {
+                    setUsername(decryptedData.username || '');
+                    setPassword(decryptedData.password || '');
+                } else if (type === 'NOTE') {
+                    setNote(decryptedData.note || '');
+                } else if (type === 'LINK') {
+                    setUrl(decryptedData.url || '');
+                }
+            }
         }
-    };
-    // Hàm sinh mật khẩu siêu tốc (16 ký tự)
+    }, [item, isOpen, masterKey]);
+
     const handleGeneratePassword = () => {
         const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=';
         let newPassword = '';
@@ -53,104 +56,135 @@ export const EditSecretModal: React.FC<EditSecretModalProps> = ({ isOpen, onClos
             newPassword += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         setPassword(newPassword);
-        toast.success('Đã tạo mật khẩu ngẫu nhiên siêu mạnh!'); // Khoe thư viện toast vừa cài luôn!
+        toast.success('Đã tạo mật khẩu ngẫu nhiên!');
     };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!title.trim() || !masterKey || !item?.id) return;
+
+        setIsSubmitting(true);
+        try {
+            const payload: Record<string, string> = { type: itemType };
+
+            if (itemType === 'PASSWORD') {
+                payload.username = username;
+                payload.password = password;
+            } else if (itemType === 'NOTE') {
+                payload.note = note;
+            } else if (itemType === 'LINK') {
+                payload.url = url;
+            }
+
+            await updateSecretItem(item.id, title, payload, masterKey);
+
+            onSuccess();
+            onClose();
+            toast.success('Đã cập nhật dữ liệu!');
+        } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : 'Có lỗi xảy ra khi cập nhật!');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    if (!isOpen || !item) return null;
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="flex justify-between items-center p-4 border-b">
-                    <h3 className="text-lg font-bold text-slate-800">Chỉnh Sửa Mật Khẩu</h3>
-                    <button onClick={onClose} className="text-slate-400 hover:bg-slate-100 p-2 rounded-lg">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b">
+                    <h2 className="text-lg font-semibold text-slate-800">Chỉnh Sửa Dữ Liệu</h2>
+                    <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                         <X size={20} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Tên Dịch Vụ / Server *</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Tiêu đề (VD: Github, Thẻ Visa...)</label>
                         <input
-                            required autoFocus type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+                            type="text"
+                            required
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
                             className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Tài khoản (Username)</label>
-                        <input
-                            type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                            className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
+
+                    <div className="flex bg-slate-100 p-1 rounded-lg mt-2 mb-4">
+                        <button type="button" onClick={() => setItemType('PASSWORD')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${itemType === 'PASSWORD' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                            <KeyRound size={16} /> Mật khẩu
+                        </button>
+                        <button type="button" onClick={() => setItemType('NOTE')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${itemType === 'NOTE' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                            <FileText size={16} /> Ghi chú
+                        </button>
+                        <button type="button" onClick={() => setItemType('LINK')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${itemType === 'LINK' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                            <LinkIcon size={16} /> Đường dẫn
+                        </button>
                     </div>
-                    {/* <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu (Password)</label>
-                        <input
-                            type="text" value={password} onChange={(e) => setPassword(e.target.value)}
-                            className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
-                    </div> */}
 
-                    {/* <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu (Password)</label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full p-3 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono tracking-wider text-blue-600 font-medium"
+                    <div className="space-y-4 min-h-[140px]">
+                        {itemType === 'PASSWORD' && (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Tài khoản (Username / Email)</label>
+                                    <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu (Password)</label>
+                                    <div className="relative flex items-center">
+                                        <input
+                                            type={showPassword ? 'text' : 'password'}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full p-3 pr-20 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono tracking-wider text-blue-600 font-medium"
+                                        />
+                                        <div className="absolute right-2 flex gap-1">
+                                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                            </button>
+                                            <button type="button" onClick={handleGeneratePassword} title="Tạo mật khẩu tự động" className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                                <Dices size={20} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
 
-                                // className="w-full p-3 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                                placeholder="••••••••"
-                            />
-                            <button
-                                type="button"
-                                onClick={handleGeneratePassword}
-                                title="Tạo mật khẩu ngẫu nhiên"
-                                className="absolute right-2 top-2 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            >
-                                <Dices size={20} />
-                            </button>
-                        </div>
-                    </div> */}
-
-
-
-
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu (Password)</label>
-                        <div className="relative flex items-center">
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full p-3 pr-20 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono tracking-wider text-blue-600 font-medium"
-                                placeholder="••••••••"
-                            />
-
-                            {/* Nhóm 2 nút: Con mắt và Xúc xắc */}
-                            <div className="absolute right-2 flex gap-1">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                >
-                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleGeneratePassword}
-                                    title="Tạo mật khẩu ngẫu nhiên"
-                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                >
-                                    <Dices size={20} />
-                                </button>
+                        {itemType === 'NOTE' && (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Nội dung ghi chú bí mật</label>
+                                <textarea
+                                    value={note}
+                                    onChange={(e) => setNote(e.target.value)}
+                                    rows={4}
+                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                                />
                             </div>
-                        </div>
+                        )}
+
+                        {itemType === 'LINK' && (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Đường dẫn bí mật (URL)</label>
+                                <input
+                                    type="url"
+                                    value={url}
+                                    onChange={(e) => setUrl(e.target.value)}
+                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-blue-600"
+                                />
+                            </div>
+                        )}
                     </div>
-                    <div className="pt-4 flex gap-3">
-                        <button type="button" onClick={onClose} className="flex-1 p-3 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium">
+
+                    <div className="flex gap-3 pt-4 border-t mt-6">
+                        <button type="button" onClick={onClose} className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition-colors">
                             Hủy
                         </button>
-                        <button type="submit" disabled={loading} className="flex-1 p-3 flex justify-center items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50">
-                            <Save size={18} /> {loading ? 'Đang lưu...' : 'Cập nhật'}
+                        <button type="submit" disabled={isSubmitting} className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50">
+                            <Save size={18} />
+                            {isSubmitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
                         </button>
                     </div>
                 </form>

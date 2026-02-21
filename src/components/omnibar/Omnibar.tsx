@@ -34,7 +34,10 @@ export const Omnibar = () => {
             // Nhấn Cmd+K hoặc Ctrl+K để mở/đóng
             if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
-                setIsOpen((open) => !open);
+                setIsOpen((open) => {
+                    if (!open) setQuery(''); // Xóa text cũ khi mở lại
+                    return !open;
+                });
             }
             // Nhấn Esc để đóng
             if (e.key === 'Escape') {
@@ -50,7 +53,6 @@ export const Omnibar = () => {
     useEffect(() => {
         if (isOpen) {
             setTimeout(() => inputRef.current?.focus(), 50);
-            setQuery(''); // Xóa text cũ khi mở lại
         }
     }, [isOpen]);
 

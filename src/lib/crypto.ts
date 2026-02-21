@@ -2,23 +2,24 @@
 import CryptoJS from 'crypto-js';
 
 /**
- * Mã hóa một chuỗi dữ liệu
- * @param data Dữ liệu gốc cần mã hóa (ví dụ: password123)
+ * Mã hóa dữ liệu (object hoặc string)
+ * @param data Dữ liệu gốc cần mã hóa — nếu là object sẽ tự JSON.stringify
  * @param secretKey Master Password của bạn
  * @returns Chuỗi đã mã hóa (Ciphertext)
  */
-export const encryptData = (data: string, secretKey: string): string => {
+export const encryptData = (data: Record<string, string> | string, secretKey: string): string => {
     if (!data || !secretKey) throw new Error('Thiếu dữ liệu hoặc Key mã hóa');
-    return CryptoJS.AES.encrypt(data, secretKey).toString();
+    const plainText = typeof data === 'string' ? data : JSON.stringify(data);
+    return CryptoJS.AES.encrypt(plainText, secretKey).toString();
 };
 
 /**
- * Giải mã một chuỗi dữ liệu
+ * Giải mã dữ liệu và tự parse JSON
  * @param ciphertext Chuỗi đã bị mã hóa
  * @param secretKey Master Password của bạn
- * @returns Dữ liệu gốc, trả về null nếu sai Key
+ * @returns Dữ liệu gốc đã parse, trả về null nếu sai Key
  */
-export const decryptData = (ciphertext: string, secretKey: string): string | null => {
+export const decryptData = (ciphertext: string, secretKey: string): Record<string, string> | null => {
     if (!ciphertext || !secretKey) return null;
 
     try {
@@ -28,8 +29,8 @@ export const decryptData = (ciphertext: string, secretKey: string): string | nul
         // Nếu giải mã thất bại (sai key), originalText sẽ là chuỗi rỗng
         if (!originalText) return null;
 
-        return originalText;
-    } catch (error) {
-        return null; // Bắt lỗi nếu chuỗi ciphertext bị hỏng
+        return JSON.parse(originalText);
+    } catch {
+        return null; // Bắt lỗi nếu chuỗi ciphertext bị hỏng hoặc parse thất bại
     }
 };

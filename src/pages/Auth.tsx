@@ -22,8 +22,8 @@ export const Auth = () => {
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
             }
-        } catch (error: any) {
-            setMessage({ text: error.message, type: 'error' });
+        } catch (error: unknown) {
+            setMessage({ text: error instanceof Error ? error.message : 'Đã xảy ra lỗi', type: 'error' });
         } finally {
             setLoading(false);
         }
