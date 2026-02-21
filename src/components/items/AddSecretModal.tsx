@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { X, Save, Dices, Eye, EyeOff, KeyRound, FileText, Link as LinkIcon } from 'lucide-react';
 import { useVaultStore } from '../../store/vaultStore';
-import { createSecretItem } from '../../services/itemService'; // SỬA: Lấy từ itemService
+import { createSecretItem } from '../../services/itemService';
 import { toast } from 'react-hot-toast';
+import type { SecretPayload } from '../../types';
+import { RichTextEditor } from '../editor/RichTextEditor';
+import { fetchLinkMetadata, type LinkMetadata } from '../../lib/linkPreview';
+import { LinkPreviewCard } from './LinkPreviewCard';
 
 interface AddSecretModalProps {
     isOpen: boolean;
@@ -20,9 +24,28 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({ isOpen, onClose,
 
     const [note, setNote] = useState('');
     const [url, setUrl] = useState('');
+    const [linkDescription, setLinkDescription] = useState('');
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { masterKey } = useVaultStore();
+
+    // Link Preview
+    const [linkMetadata, setLinkMetadata] = useState<LinkMetadata | null>(null);
+    const [isFetchingPreview, setIsFetchingPreview] = useState(false);
+    const lastFetchedUrl = useRef('');
+
+    const handleFetchPreview = useCallback(async (inputUrl: string) => {
+        const trimmed = inputUrl.trim();
+        if (!trimmed || !trimmed.startsWith('http') || trimmed === lastFetchedUrl.current) return;
+
+        lastFetchedUrl.current = trimmed;
+        setIsFetchingPreview(true);
+        setLinkMetadata(null);
+
+        const metadata = await fetchLinkMetadata(trimmed);
+        setLinkMetadata(metadata);
+        setIsFetchingPreview(false);
+    }, []);
 
     const handleGeneratePassword = () => {
         const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=';
@@ -40,21 +63,19 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({ isOpen, onClose,
 
         setIsSubmitting(true);
         try {
-            const payload: Record<string, string> = { type: itemType };
+            let payload: SecretPayload;
 
             if (itemType === 'PASSWORD') {
-                payload.username = username;
-                payload.password = password;
+                payload = { type: 'PASSWORD', username, password };
             } else if (itemType === 'NOTE') {
-                payload.note = note;
-            } else if (itemType === 'LINK') {
-                payload.url = url;
+                payload = { type: 'NOTE', note };
+            } else {
+                payload = { type: 'LINK', url, description: linkDescription };
             }
 
             await createSecretItem(title, payload, masterKey); // SỬA: Dùng hàm của bạn
 
-            setTitle(''); setUsername(''); setPassword(''); setNote(''); setUrl('');
-            setItemType('PASSWORD');
+            setTitle(''); setUsername(''); setPassword(''); setNote(''); setUrl(''); setLinkDescription('');
 
             onSuccess();
             onClose();
@@ -137,26 +158,57 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({ isOpen, onClose,
                         {itemType === 'NOTE' && (
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Nội dung ghi chú bí mật</label>
-                                <textarea
-                                    value={note}
-                                    onChange={(e) => setNote(e.target.value)}
-                                    rows={4}
+                                <RichTextEditor
+                                    content={note}
+                                    onChange={setNote}
                                     placeholder="Nhập mã Recovery Code, thẻ tín dụng, văn bản riêng tư..."
-                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                                 />
                             </div>
                         )}
 
                         {itemType === 'LINK' && (
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Đường dẫn bí mật (URL)</label>
-                                <input
-                                    type="url"
-                                    value={url}
-                                    onChange={(e) => setUrl(e.target.value)}
-                                    placeholder="https://..."
-                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-blue-600"
-                                />
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Đường dẫn bí mật (URL)</label>
+                                    <input
+                                        type="url"
+                                        value={url}
+                                        onChange={(e) => setUrl(e.target.value)}
+                                        onBlur={(e) => handleFetchPreview(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleFetchPreview(url);
+                                            }
+                                        }}
+                                        placeholder="https://... (nhận Enter hoặc tab ra ngoài để xem trước)"
+                                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-blue-600"
+                                    />
+                                </div>
+
+                                {/* Link Preview Card */}
+                                {(isFetchingPreview || linkMetadata) && (
+                                    <LinkPreviewCard
+                                        metadata={linkMetadata || { title: '', description: '', image: null, logo: null, url: '' }}
+                                        isLoading={isFetchingPreview}
+                                        onApplyTitle={linkMetadata?.title ? () => setTitle(linkMetadata.title) : undefined}
+                                        onApplyDescription={linkMetadata?.description ? () => setLinkDescription(`<p>${linkMetadata.description}</p>`) : undefined}
+                                        onApplyAll={linkMetadata ? () => {
+                                            if (linkMetadata.title) setTitle(linkMetadata.title);
+                                            if (linkMetadata.description) setLinkDescription(`<p>${linkMetadata.description}</p>`);
+                                            toast.success('Đã áp dụng tiêu đề và mô tả!');
+                                        } : undefined}
+                                    />
+                                )}
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả (tùy chọn)</label>
+                                    <RichTextEditor
+                                        content={linkDescription}
+                                        onChange={setLinkDescription}
+                                        placeholder="Ghi chú mô tả cho đường dẫn này..."
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>

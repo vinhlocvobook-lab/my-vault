@@ -6,6 +6,10 @@
 		{
 			"name": "my-vault-app",
 			"path": ".."
+		},
+		{
+			"name": "SSH FS - local_ubuntu",
+			"uri": "ssh://local_ubuntu/"
 		}
 	],
 	"settings": {}

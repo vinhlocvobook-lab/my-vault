@@ -7,7 +7,7 @@ import CryptoJS from 'crypto-js';
  * @param secretKey Master Password của bạn
  * @returns Chuỗi đã mã hóa (Ciphertext)
  */
-export const encryptData = (data: Record<string, string> | string, secretKey: string): string => {
+export const encryptData = (data: unknown, secretKey: string): string => {
     if (!data || !secretKey) throw new Error('Thiếu dữ liệu hoặc Key mã hóa');
     const plainText = typeof data === 'string' ? data : JSON.stringify(data);
     return CryptoJS.AES.encrypt(plainText, secretKey).toString();
@@ -19,7 +19,7 @@ export const encryptData = (data: Record<string, string> | string, secretKey: st
  * @param secretKey Master Password của bạn
  * @returns Dữ liệu gốc đã parse, trả về null nếu sai Key
  */
-export const decryptData = (ciphertext: string, secretKey: string): Record<string, string> | null => {
+export const decryptData = (ciphertext: string, secretKey: string): any | null => {
     if (!ciphertext || !secretKey) return null;
 
     try {

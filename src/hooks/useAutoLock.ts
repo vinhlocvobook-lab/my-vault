@@ -1,11 +1,13 @@
 // Đường dẫn: src/hooks/useAutoLock.ts
 import { useEffect, useRef } from 'react';
 import { useVaultStore } from '../store/vaultStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { toast } from 'react-hot-toast';
 
-export const useAutoLock = (timeoutMs: number = 3 * 60 * 1000) => {
+export const useAutoLock = () => {
     const lockVault = useVaultStore((state) => state.lockVault);
     const masterKey = useVaultStore((state) => state.masterKey);
+    const autoLockTimeout = useSettingsStore((state) => state.autoLockTimeout);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // 1. Khởi tạo loa âm thanh và giữ nó trong RAM bằng useRef
@@ -36,7 +38,8 @@ export const useAutoLock = (timeoutMs: number = 3 * 60 * 1000) => {
     }, []);
 
     useEffect(() => {
-        if (!masterKey) return;
+        // Nếu chưa unlock hoặc timeout = 0 (tắt auto-lock) → không làm gì
+        if (!masterKey || autoLockTimeout === 0) return;
 
         const handleVisibilityChange = () => {
             if (document.hidden) {
@@ -56,7 +59,7 @@ export const useAutoLock = (timeoutMs: number = 3 * 60 * 1000) => {
                             icon: '/vite.svg',
                         });
                     }
-                }, timeoutMs);
+                }, autoLockTimeout);
             } else {
                 if (timeoutRef.current) {
                     clearTimeout(timeoutRef.current);
@@ -71,5 +74,5 @@ export const useAutoLock = (timeoutMs: number = 3 * 60 * 1000) => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [masterKey, lockVault, timeoutMs]);
+    }, [masterKey, lockVault, autoLockTimeout]);
 };

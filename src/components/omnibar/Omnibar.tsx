@@ -1,5 +1,5 @@
 // Đường dẫn: src/components/omnibar/Omnibar.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Fuse from 'fuse.js';
 import { Search, Server, Link as LinkIcon, FileText, X } from 'lucide-react';
 import type { VaultItem } from '../../types';

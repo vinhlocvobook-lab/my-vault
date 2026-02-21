@@ -1,5 +1,7 @@
 // Đường dẫn: src/pages/Auth.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { Shield } from 'lucide-react';
 
@@ -8,6 +10,15 @@ export const Auth = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [message, setMessage] = useState({ text: '', type: '' });
+
+    const { session, isLoading } = useAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (!isLoading && session) {
+            navigate('/');
+        }
+    }, [isLoading, session, navigate]);
 
     const handleAuth = async (type: 'LOGIN' | 'SIGNUP') => {
         setLoading(true);

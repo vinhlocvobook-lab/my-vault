@@ -1,7 +1,7 @@
 // Đường dẫn: src/services/itemService.ts
 import { supabase } from '../lib/supabase';
 import { encryptData } from '../lib/crypto';
-import type { VaultItem } from '../types';
+import type { VaultItem, SecretPayload } from '../types';
 
 /**
  * Tạo một Secret mới (Password, Server Credential...)
@@ -9,7 +9,7 @@ import type { VaultItem } from '../types';
  */
 export const createSecretItem = async (
     title: string,
-    secretPayload: object,
+    secretPayload: SecretPayload,
     masterKey: string
 ): Promise<VaultItem> => {
 
@@ -72,7 +72,7 @@ export const deleteItem = async (id: string): Promise<void> => {
 export const updateSecretItem = async (
     id: string,
     title: string,
-    secretPayload: object,
+    secretPayload: SecretPayload,
     masterKey: string
 ): Promise<void> => {
 

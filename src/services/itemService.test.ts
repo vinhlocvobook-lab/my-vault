@@ -33,7 +33,7 @@ vi.mock('../lib/supabase', () => ({
 describe('Item Service (Tầng Dữ Liệu)', () => {
     it('Phải mã hóa payload và gọi Supabase insert thành công', async () => {
         const masterKey = 'super-secret';
-        const payload = { username: 'admin', password: '123' };
+        const payload = { type: 'PASSWORD' as const, username: 'admin', password: '123' };
 
         // Thực thi hàm lưu Secret
         const result = await createSecretItem('My Server', payload, masterKey);

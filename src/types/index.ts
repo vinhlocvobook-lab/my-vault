@@ -2,6 +2,11 @@
 
 export type ItemType = 'LINK' | 'SECRET' | 'NOTE' | 'TODO' | 'IDEA' | 'SNIPPET';
 
+export type SecretPayload =
+    | { type: 'PASSWORD'; username?: string; password?: string }
+    | { type: 'NOTE'; note?: string }
+    | { type: 'LINK'; url?: string; description?: string };
+
 // Cấu trúc của một Item lưu trong Database
 export interface VaultItem {
     id?: string;

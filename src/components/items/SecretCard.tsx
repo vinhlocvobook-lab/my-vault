@@ -121,9 +121,10 @@ export const SecretCard: React.FC<SecretCardProps> = ({ item, onRefresh, onEdit 
                             <FileText size={16} />
                             <span>Ghi chú bí mật</span>
                         </div>
-                        <p className="text-slate-700 whitespace-pre-wrap font-mono text-sm leading-relaxed max-h-32 overflow-y-auto pr-8">
-                            {decryptedData.note || '(trống)'}
-                        </p>
+                        <div
+                            className="note-preview text-slate-700 text-sm leading-relaxed max-h-32 overflow-y-auto pr-8"
+                            dangerouslySetInnerHTML={{ __html: decryptedData.note || '<p>(trống)</p>' }}
+                        />
                         <button
                             onClick={() => handleCopy(decryptedData.note, 'note')}
                             className="absolute top-2 right-2 p-1.5 bg-white text-slate-400 hover:text-amber-600 rounded opacity-0 group-hover/note:opacity-100 transition-opacity shadow-sm border border-amber-100"
@@ -135,31 +136,41 @@ export const SecretCard: React.FC<SecretCardProps> = ({ item, onRefresh, onEdit 
                 )}
 
                 {decryptedType === 'LINK' && (
-                    <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-100">
-                        <div className="flex items-center gap-2 overflow-hidden mr-2">
-                            <LinkIcon size={18} className="text-blue-500 flex-shrink-0" />
-                            <span className="text-blue-700 truncate text-sm font-medium">
-                                {decryptedData.url || '(trống)'}
-                            </span>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-100">
+                            <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                <LinkIcon size={18} className="text-blue-500 flex-shrink-0" />
+                                <span className="text-blue-700 truncate text-sm font-medium">
+                                    {decryptedData.url || '(trống)'}
+                                </span>
+                            </div>
+                            <div className="flex gap-1 flex-shrink-0">
+                                <button
+                                    onClick={() => handleCopy(decryptedData.url, 'url')}
+                                    className="p-1.5 text-blue-400 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
+                                    title="Copy Link"
+                                >
+                                    <Copy size={16} />
+                                </button>
+                                <a
+                                    href={decryptedData.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1.5 text-blue-400 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
+                                    title="Mở Link trong tab mới"
+                                >
+                                    <ExternalLink size={16} />
+                                </a>
+                            </div>
                         </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                            <button
-                                onClick={() => handleCopy(decryptedData.url, 'url')}
-                                className="p-1.5 text-blue-400 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
-                                title="Copy Link"
-                            >
-                                <Copy size={16} />
-                            </button>
-                            <a
-                                href={decryptedData.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1.5 text-blue-400 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
-                                title="Mở Link trong tab mới"
-                            >
-                                <ExternalLink size={16} />
-                            </a>
-                        </div>
+                        {decryptedData.description && decryptedData.description !== '<p></p>' && (
+                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                <div
+                                    className="note-preview text-slate-600 text-sm leading-relaxed max-h-24 overflow-y-auto"
+                                    dangerouslySetInnerHTML={{ __html: decryptedData.description }}
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

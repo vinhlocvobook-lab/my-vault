@@ -1,6 +1,7 @@
 // Đường dẫn: src/components/auth/UnlockVault.tsx
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast'; // Thêm import này
+import { useNavigate } from 'react-router-dom';
 import { useVaultStore } from '../../store/vaultStore';
 import { KeyRound, Eye, EyeOff } from 'lucide-react';
 
@@ -8,7 +9,15 @@ import { KeyRound, Eye, EyeOff } from 'lucide-react';
 export const UnlockVault = () => {
     const [password, setPassword] = useState('');
     const unlockVault = useVaultStore((state) => state.unlockVault);
+    const masterKey = useVaultStore((state) => state.masterKey);
+    const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
+
+    React.useEffect(() => {
+        if (masterKey) {
+            navigate('/');
+        }
+    }, [masterKey, navigate]);
 
     // const handleUnlock = (e: React.FormEvent) => {
     //     e.preventDefault();
